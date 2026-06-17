@@ -1,9 +1,9 @@
 """
-Nexus Guard — LangChain Integration
+Qovaris — LangChain Integration
 =====================================
 
-Provides :class:`NexusSecureTool`, a drop-in ``BaseTool`` wrapper that routes
-every LangChain tool invocation through the Nexus Sentinel gateway for
+Provides :class:`QovarisSecureTool`, a drop-in ``BaseTool`` wrapper that routes
+every LangChain tool invocation through the Qovaris Sentinel gateway for
 intent-verification before execution.
 
 Requires ``langchain-core >= 0.3.0``.  Import errors are surfaced clearly so
@@ -13,18 +13,18 @@ Example
 -------
 ::
 
-    from nexus_guard import NexusFinOpsGuard
-    from nexus_guard.langchain import NexusSecureTool
+    from qovaris import QovarisGuard
+    from qovaris.integrations.langchain import QovarisSecureTool
     from langchain_core.tools import tool
 
-    guard = NexusFinOpsGuard(api_key="nx_key")
+    guard = QovarisGuard(api_key="nx_key")
 
     @tool
     def search(query: str) -> str:
         \"\"\"Search the catalog.\"\"\"
         return f"Results for {query}"
 
-    secure = NexusSecureTool(
+    secure = QovarisSecureTool(
         wrapped_tool=search,
         guard=guard,
         allowed_intent="Search books under $50",
@@ -44,17 +44,17 @@ try:
     from pydantic import BaseModel, ConfigDict
 except ImportError as _exc:
     raise ImportError(
-        "langchain-core is required for NexusSecureTool. "
+        "langchain-core is required for QovarisSecureTool. "
         "Install it with:  pip install 'langchain-core>=0.3.0'"
     ) from _exc
 
-from .guard import NexusFinOpsGuard
+from ...core import QovarisGuard
 
-__all__ = ["NexusSecureTool"]
+__all__ = ["QovarisSecureTool"]
 
 
-class NexusSecureTool(BaseTool):
-    """LangChain tool that verifies every invocation through the Nexus gateway.
+class QovarisSecureTool(BaseTool):
+    """LangChain tool that verifies every invocation through the Qovaris gateway.
 
     The wrapper inherits the original tool's ``name``, ``description``, and
     ``args_schema`` so it is a transparent substitute in any LangChain chain
@@ -64,15 +64,15 @@ class NexusSecureTool(BaseTool):
     ----------
     wrapped_tool : BaseTool
         The original LangChain tool to protect.
-    guard : NexusFinOpsGuard
-        An initialised Nexus Guard instance.
+    guard : QovarisGuard
+        An initialised Qovaris instance.
     allowed_intent : str
         A plain-English constraint describing what this tool is permitted to do.
     """
 
     # --- Pydantic model fields -------------------------------------------
     wrapped_tool: Any          # BaseTool — typed as Any to avoid fwd-ref issues
-    guard: Any                 # NexusFinOpsGuard
+    guard: Any                 # QovarisGuard
     allowed_intent: str = ""
 
     # Inherited from the wrapped tool during __init__
@@ -85,7 +85,7 @@ class NexusSecureTool(BaseTool):
     def __init__(
         self,
         wrapped_tool: BaseTool,
-        guard: NexusFinOpsGuard,
+        guard: QovarisGuard,
         allowed_intent: str = "",
         **kwargs: Any,
     ) -> None:
@@ -107,7 +107,7 @@ class NexusSecureTool(BaseTool):
         """Verify this invocation through the shared guard enforcement path.
 
         Works identically in remote (HTTP ``/verify``) and embedded (in-process)
-        modes because it delegates to :meth:`NexusFinOpsGuard._authorize`.
+        modes because it delegates to :meth:`QovarisGuard._authorize`.
         Raises :class:`SecurityBlockException` if denied, unless
         ``guard.fail_open`` is ``True`` and the gateway is unreachable.
         """

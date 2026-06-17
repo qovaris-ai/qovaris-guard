@@ -1,13 +1,13 @@
 """
-Nexus Guard — LangGraph / LangChain Callback Integration
+Qovaris — LangGraph / LangChain Callback Integration
 ==========================================================
 
-Provides :class:`NexusSentinelCallback`, a :class:`BaseCallbackHandler` that
-streams tool invocation and error events to the Nexus Sentinel gateway for
+Provides :class:`QovarisCallback`, a :class:`BaseCallbackHandler` that
+streams tool invocation and error events to the Qovaris Sentinel gateway for
 observability.
 
 This handler is **non-blocking** — it logs events but never prevents tool
-execution.  Use :class:`~nexus_guard.langchain.NexusSecureTool` for active
+execution.  Use :class:`~qovaris.integrations.langchain.QovarisSecureTool` for active
 verification and blocking.
 
 Requires ``langchain-core >= 0.3.0``.  Import errors are surfaced clearly so
@@ -17,11 +17,11 @@ Example
 -------
 ::
 
-    from nexus_guard import NexusFinOpsGuard
-    from nexus_guard.langgraph import NexusSentinelCallback
+    from qovaris import QovarisGuard
+    from qovaris.integrations.langchain import QovarisCallback
 
-    guard = NexusFinOpsGuard(api_key="nx_key")
-    callback = NexusSentinelCallback(guard=guard)
+    guard = QovarisGuard(api_key="nx_key")
+    callback = QovarisCallback(guard=guard)
 
     # Pass to your LangChain / LangGraph agent as a callback:
     agent.run("Do something", callbacks=[callback])
@@ -40,19 +40,19 @@ try:
     from langchain_core.callbacks import BaseCallbackHandler
 except ImportError as _exc:
     raise ImportError(
-        "langchain-core is required for NexusSentinelCallback. "
+        "langchain-core is required for QovarisCallback. "
         "Install it with:  pip install 'langchain-core>=0.3.0'"
     ) from _exc
 
-from .guard import NexusFinOpsGuard
+from ...core import QovarisGuard
 
-__all__ = ["NexusSentinelCallback"]
+__all__ = ["QovarisCallback"]
 
 logger = logging.getLogger(__name__)
 
 
-class NexusSentinelCallback(BaseCallbackHandler):
-    """LangChain callback handler that logs tool events to the Nexus gateway.
+class QovarisCallback(BaseCallbackHandler):
+    """LangChain callback handler that logs tool events to the Qovaris gateway.
 
     This is purely for **observability** — it sends structured event payloads
     to ``/api/callback_log`` on the Sentinel gateway so operators can monitor
@@ -63,11 +63,11 @@ class NexusSentinelCallback(BaseCallbackHandler):
 
     Parameters
     ----------
-    guard : NexusFinOpsGuard
-        An initialised Nexus Guard instance providing gateway URL and API key.
+    guard : QovarisGuard
+        An initialised Qovaris instance providing gateway URL and API key.
     """
 
-    def __init__(self, guard: NexusFinOpsGuard) -> None:
+    def __init__(self, guard: QovarisGuard) -> None:
         super().__init__()
         self.guard = guard
 
@@ -105,7 +105,7 @@ class NexusSentinelCallback(BaseCallbackHandler):
             with urllib.request.urlopen(req, timeout=5) as resp:
                 resp.read()  # drain response body
         except (urllib.error.URLError, OSError) as exc:
-            logger.debug("Nexus callback_log POST failed (non-fatal): %s", exc)
+            logger.debug("Qovaris callback_log POST failed (non-fatal): %s", exc)
 
     # ------------------------------------------------------------------ #
     #  BaseCallbackHandler overrides

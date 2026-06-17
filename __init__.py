@@ -1,10 +1,10 @@
 """
 Backward-compatible shim.
 
-Original imports like ``from sdk.guard import NexusFinOpsGuard`` continue to
-work by redirecting to ``sdk.nexus_guard.guard``.
+Original imports like ``from sdk.guard import QovarisGuard`` continue to
+work by redirecting to ``sdk.qovaris.core``.
 """
 
-from .nexus_guard.guard import NexusFinOpsGuard, SecurityBlockException
+from .qovaris.core import QovarisGuard, SecurityBlockException
 
-__all__ = ["NexusFinOpsGuard", "SecurityBlockException"]
+__all__ = ["QovarisGuard", "SecurityBlockException"]

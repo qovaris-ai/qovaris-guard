@@ -1,5 +1,5 @@
 """
-Nexus Guard — Stripe Machine Payments Protocol (MPP) Integration
+Qovaris — Stripe Machine Payments Protocol (MPP) Integration
 =================================================================
 
 `MPP <https://mpp.dev/>`_ is the open ``Payment`` HTTP authentication scheme
@@ -19,23 +19,23 @@ The flow is **Challenge → Credential → Receipt**:
    ``Authorization: Payment ...`` credential.
 4. On success the server returns a ``Payment-Receipt`` header.
 
-**Where Nexus fits:** a malicious or hallucinating agent will happily pay any
+**Where Qovaris fits:** a malicious or hallucinating agent will happily pay any
 402 challenge it encounters — that is exactly the "purchase intent" attack
 surface.  :class:`MPPGuard` parses the challenge and runs it through the same
 firewall used for every other tool call **before** the agent is allowed to
 authorise payment.  Budget caps, MCC blocks, and HITL all apply.
 
 This module is **stdlib-only**.  It does not perform settlement itself — you
-supply a ``payer`` callable that produces the credential once Nexus approves.
+supply a ``payer`` callable that produces the credential once Qovaris approves.
 
 Example
 -------
 ::
 
-    from nexus_guard import NexusFinOpsGuard
-    from nexus_guard.mpp import MPPGuard
+    from qovaris import QovarisGuard
+    from qovaris.internal.mpp import MPPGuard
 
-    guard = NexusFinOpsGuard(mode="embedded", spend_threshold=50)
+    guard = QovarisGuard(mode="embedded", spend_threshold=50)
     mpp = MPPGuard(guard)
 
     challenge = response.headers["WWW-Authenticate"]   # from a 402 response
@@ -53,7 +53,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional
 
-from .guard import NexusFinOpsGuard, SecurityBlockException
+from ..core import QovarisGuard, SecurityBlockException
 
 __all__ = [
     "PaymentChallenge",
@@ -213,13 +213,13 @@ def parse_payment_challenge(header_value: str) -> PaymentChallenge:
 class MPPGuard:
     """Firewall for Machine Payments Protocol (MPP) purchase intents.
 
-    Wraps a :class:`NexusFinOpsGuard` so that every 402 payment challenge an
+    Wraps a :class:`QovarisGuard` so that every 402 payment challenge an
     agent encounters is evaluated against the active session intent, budget
     caps, and merchant policy **before** payment is authorised.
 
     Parameters
     ----------
-    guard : NexusFinOpsGuard
+    guard : QovarisGuard
         The guard whose policy engine (embedded or remote) and session intent
         drive the decision.
     allowed_intent : str
@@ -231,7 +231,7 @@ class MPPGuard:
 
     def __init__(
         self,
-        guard: NexusFinOpsGuard,
+        guard: QovarisGuard,
         allowed_intent: str = "Authorise machine (MPP) payments within session budget",
         reject_expired: bool = True,
     ) -> None:

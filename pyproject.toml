@@ -3,13 +3,13 @@ requires = ["setuptools>=69.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nexus-guard"
+name = "qovaris"
 version = "0.1.0"
 description = "The Security SDK for Autonomous AI Agents — an intent-verification firewall for agent tool calls."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
-authors = [{ name = "Nexus Guard" }]
+authors = [{ name = "Qovaris" }]
 keywords = [
     "ai",
     "agents",
@@ -43,26 +43,51 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# LangChain / LangGraph integrations (NexusSecureTool, NexusSentinelCallback).
+# Lightweight LangChain integrations (QovarisSecureTool, QovarisCallback).
 langchain = ["langchain-core>=0.3.0"]
+# Agent middleware (QovarisMiddleware) needs the v1 agents framework (Python >= 3.10).
+middleware = ["langchain>=1.0; python_version >= '3.10'"]
 # Everything needed to develop and test the SDK itself.
 dev = [
     "pytest>=7.0",
+    "pytest-asyncio>=0.23",
     "langchain-core>=0.3.0",
+    "langchain>=1.0; python_version >= '3.10'",
+    # Pinned per LangChain guidance: new standard tests can break CI.
+    "langchain-tests==1.1.9; python_version >= '3.10'",
     "langgraph>=0.2.0",
     "build>=1.0",
 ]
 
+# uv-style groups matching the LangChain standard-tests docs:
+#   uv run --group test pytest tests/unit_tests/
+#   uv run --group test --group test_integration pytest tests/integration_tests/
+[dependency-groups]
+test = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23",
+    "langchain-core>=0.3.0",
+    "langchain-tests==1.1.9; python_version >= '3.10'",
+]
+test_integration = [
+    "langchain>=1.0; python_version >= '3.10'",
+    "langgraph>=0.2.0",
+]
+
 [project.urls]
-Homepage = "https://github.com/nexus-pay/nexus-guard"
-Documentation = "https://github.com/nexus-pay/nexus-guard#readme"
-Repository = "https://github.com/nexus-pay/nexus-guard"
-Issues = "https://github.com/nexus-pay/nexus-guard/issues"
+Homepage = "https://qovaris.ai"
+Documentation = "https://github.com/Augis363/qovaris-guard#readme"
+Repository = "https://github.com/Augis363/qovaris-guard"
+Issues = "https://github.com/Augis363/qovaris-guard/issues"
 
 [tool.setuptools.packages.find]
-# The importable package lives next to this file as ``nexus_guard/``.
-include = ["nexus_guard*"]
+# The importable package lives next to this file as ``qovaris/``.
+include = ["qovaris*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+# Make ``from qovaris import ...`` resolve without installing the package.
+pythonpath = ["."]
+# Required by langchain-tests' standard suite, which mixes sync + async tests.
+asyncio_mode = "auto"

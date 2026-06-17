@@ -1,0 +1,129 @@
+---
+title: "Qovaris middleware integration"
+description: "Integrate with the Qovaris security middleware using LangChain Python."
+---
+
+This guide provides a quick overview for getting started with the Qovaris [middleware](/oss/langchain/middleware/overview/). Qovaris is a security firewall for autonomous agents: it verifies every tool call against the agent's stated objective and your spend policy before the tool runs. For a detailed listing of all Qovaris features, parameters, and configurations, head to the [Qovaris API reference](https://github.com/Augis363/qovaris-guard/blob/main/docs/api-reference.md).
+
+## Overview
+
+### Details
+
+| Class | Package | Serializable | Downloads | Version |
+| :--- | :--- | :---: | :---: | :---: |
+| [`QovarisMiddleware`](https://github.com/Augis363/qovaris-guard/blob/main/docs/api-reference.md) | [`qovaris`](https://pypi.org/project/qovaris/) | ❌ | ![PyPI - Downloads](https://img.shields.io/pypi/dm/qovaris?style=flat-square&label=%20) | ![PyPI - Version](https://img.shields.io/pypi/v/qovaris?style=flat-square&label=%20) |
+
+### Features
+
+- Cross-provider guardrails: verifies every tool call in `wrap_tool_call` / `awrap_tool_call` before it executes; blocked calls raise `SecurityBlockException` and the tool never runs.
+- Prompt-injection and jailbreak detection on tool arguments.
+- Spend controls: per-transaction review thresholds, hard budget ceilings, and intent-stated budget caps (e.g. "under $50").
+- Merchant (MCC) blocklists for agent virtual cards and SQL statement classification (read / write / destructive) for database tools.
+- Human-in-the-loop hook for calls that need review instead of an outright block.
+- Runs fully in-process (embedded mode, zero network calls) or against a central Qovaris gateway (remote mode).
+
+---
+
+## Setup
+
+The Qovaris middleware lives in the `qovaris` package. Its core has zero dependencies; the `middleware` extra pulls in `langchain>=1.0` (Python 3.10+):
+
+<CodeGroup>
+    ```python pip
+    pip install -U "qovaris[middleware]"
+    ```
+    ```python uv
+    uv add "qovaris[middleware]"
+    ```
+</CodeGroup>
+
+### Credentials
+
+No API key is required for **embedded** mode — the policy engine runs in-process. **Remote** mode sends verifications to your Qovaris gateway and takes an API key as a constructor argument:
+
+```python Set API key icon="key"
+import getpass
+import os
+
+if "QOVARIS_API_KEY" not in os.environ:
+    os.environ["QOVARIS_API_KEY"] = getpass.getpass("Enter your Qovaris API key: ")
+```
+
+It's also helpful (but not required) to set up LangSmith for observability and <Tooltip tip="Log each step of a model's execution to debug and improve it">tracing</Tooltip>. To enable automated tracing, set your [LangSmith](/langsmith/observability) API key:
+
+```python Enable tracing icon="flask"
+os.environ["LANGSMITH_API_KEY"] = getpass.getpass("Enter your LangSmith API key: ")
+os.environ["LANGSMITH_TRACING"] = "true"
+```
+
+---
+
+## Instantiation
+
+Import and configure the middleware. A single instance protects every tool the agent holds — no per-tool wrapping needed:
+
+```python Initialize middleware icon="arrows-shuffle"
+from qovaris import QovarisGuard
+from qovaris.integrations.langchain import QovarisMiddleware
+
+guard = QovarisGuard(
+    mode="embedded",          # in-process policy engine, zero network calls
+    spend_threshold=1000,     # human review above this per-transaction value
+    spend_limit=5000,         # hard ceiling — anything above is blocked outright
+    blocked_keywords=["drop table"],
+)
+
+middleware = QovarisMiddleware(
+    guard,
+    allowed_intents={"buy": "Purchase office supplies under $50"},
+)
+```
+
+---
+
+## Use with an agent
+
+Pass middleware to @[`create_agent`] or @[`create_deep_agent`] in order. You can combine Qovaris with [built-in middleware](/oss/langchain/middleware/built-in). Scope the agent's objective with `guard.session(...)` — every tool call inside the block is verified against it:
+
+```python Agent with middleware icon="robot"
+from langchain.agents import create_agent
+
+agent = create_agent(
+    model="claude-sonnet-4-6",
+    tools=[search, buy],
+    middleware=[middleware],
+)
+
+with guard.session("Buy a Python book under $35"):
+    agent.invoke({"messages": [{"role": "user", "content": "Order Clean Code"}]})
+```
+
+A call that violates policy — overspend, prompt injection in arguments, a blocked merchant category, a destructive SQL statement — raises `SecurityBlockException` before the tool executes.
+
+<Tip>
+    Middleware runs in the [agent loop](/oss/langchain/middleware/overview#the-agent-loop). For custom behavior, see [custom middleware](/oss/langchain/middleware/custom).
+</Tip>
+
+---
+
+## Human-in-the-loop
+
+Calls that need review (e.g. a high-value purchase) can be escalated to a human instead of denied. Provide a `hitl_handler` on the guard; return `True` to approve:
+
+```python HITL handler icon="user-check"
+def approve_in_terminal(payload, decision):
+    print(decision["reason"])
+    return input("Approve? [y/N] ").strip().lower() == "y"
+
+guard = QovarisGuard(
+    mode="embedded",
+    spend_threshold=1000,
+    hitl_handler=approve_in_terminal,
+)
+```
+
+---
+
+## API reference
+
+For detailed documentation of all Qovaris features and configurations, head to the [API reference](https://github.com/Augis363/qovaris-guard/blob/main/docs/api-reference.md).
