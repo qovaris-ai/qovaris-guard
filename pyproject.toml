@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=69.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexus-guard"
+version = "0.1.0"
+description = "The Security SDK for Autonomous AI Agents — an intent-verification firewall for agent tool calls."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Nexus Guard" }]
+keywords = [
+    "ai",
+    "agents",
+    "security",
+    "firewall",
+    "llm",
+    "tool-calling",
+    "prompt-injection",
+    "langchain",
+    "langgraph",
+    "stripe",
+    "mpp",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# The core guard is intentionally dependency-free (standard library only) so it
+# adds zero supply-chain surface to your agent.
+dependencies = []
+
+[project.optional-dependencies]
+# LangChain / LangGraph integrations (NexusSecureTool, NexusSentinelCallback).
+langchain = ["langchain-core>=0.3.0"]
+# Everything needed to develop and test the SDK itself.
+dev = [
+    "pytest>=7.0",
+    "langchain-core>=0.3.0",
+    "langgraph>=0.2.0",
+    "build>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/nexus-pay/nexus-guard"
+Documentation = "https://github.com/nexus-pay/nexus-guard#readme"
+Repository = "https://github.com/nexus-pay/nexus-guard"
+Issues = "https://github.com/nexus-pay/nexus-guard/issues"
+
+[tool.setuptools.packages.find]
+# The importable package lives next to this file as ``nexus_guard/``.
+include = ["nexus_guard*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
