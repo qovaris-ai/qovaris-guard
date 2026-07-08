@@ -44,7 +44,7 @@ except ImportError as _exc:
         "Install it with:  pip install 'langchain-core>=0.3.0'"
     ) from _exc
 
-from ...core import QovarisGuard
+from ...guard import QovarisGuard
 
 __all__ = ["QovarisCallback"]
 

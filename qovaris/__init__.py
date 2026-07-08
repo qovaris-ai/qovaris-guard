@@ -4,7 +4,10 @@ Qovaris — The Security SDK for Autonomous AI Agents
 
 Layout
 ------
-- ``core``          — the central module: decision engine + ``QovarisGuard``.
+- ``policy_engine`` — all policy definitions (static + dynamic) and the
+  decision logic (:func:`evaluate_intent`, :func:`fallback_evaluate`).
+- ``guard``         — the central place for final decisions: ``QovarisGuard``
+  enforces the engine's verdicts (embedded or remote).
 - ``internal/``     — shared libraries (e.g. ``mpp`` — Stripe Machine Payments
   Protocol firewall). Zero extra dependencies.
 - ``integrations/`` — one subpackage per framework:
@@ -33,16 +36,15 @@ LangChain / LangGraph integration (requires ``langchain-core >= 0.3.0``)
   wrapping.
 """
 
-from .core import (
+from .guard import QovarisGuard, SecurityBlockException
+from .internal.mpp import MPPGuard, PaymentChallenge, parse_payment_challenge
+from .policy_engine import (
     DEFAULT_HITL_THRESHOLD,
-    QovarisGuard,
-    SecurityBlockException,
     evaluate_intent,
     fallback_evaluate,
 )
-from .internal.mpp import MPPGuard, PaymentChallenge, parse_payment_challenge
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "QovarisGuard",

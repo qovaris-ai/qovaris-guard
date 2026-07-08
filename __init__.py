@@ -2,9 +2,9 @@
 Backward-compatible shim.
 
 Original imports like ``from sdk.guard import QovarisGuard`` continue to
-work by redirecting to ``sdk.qovaris.core``.
+work by redirecting to ``sdk.qovaris.guard``.
 """
 
-from .qovaris.core import QovarisGuard, SecurityBlockException
+from .qovaris.guard import QovarisGuard, SecurityBlockException
 
 __all__ = ["QovarisGuard", "SecurityBlockException"]

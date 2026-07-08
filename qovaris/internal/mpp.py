@@ -53,7 +53,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional
 
-from ..core import QovarisGuard, SecurityBlockException
+from ..guard import QovarisGuard, SecurityBlockException
 
 __all__ = [
     "PaymentChallenge",

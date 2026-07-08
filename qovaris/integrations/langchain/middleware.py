@@ -55,7 +55,7 @@ except ImportError as _exc:  # pragma: no cover - exercised only without langcha
         "(or  pip install 'langchain>=1.0' )"
     ) from _exc
 
-from ...core import QovarisGuard
+from ...guard import QovarisGuard
 
 __all__ = ["QovarisMiddleware"]
 
@@ -65,7 +65,7 @@ class QovarisMiddleware(AgentMiddleware):
 
     Drop a single instance into ``create_agent(..., middleware=[...])`` and every
     tool invocation is checked against the agent's stated objective before it
-    runs.  Denied calls raise :class:`~qovaris.core.SecurityBlockException`
+    runs.  Denied calls raise :class:`~qovaris.guard.SecurityBlockException`
     (the same contract as the rest of the SDK), unless ``guard.fail_open`` is
     ``True`` and the gateway is unreachable.
 
