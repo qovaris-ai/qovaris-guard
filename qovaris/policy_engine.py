@@ -13,7 +13,7 @@ Everything policy lives here, in two layers:
 2. **Dynamic policy** — the user-defined knobs and rules that arrive from a
    guard's configuration or the dashboard-managed cloud policy:
    ``spend_threshold``, ``spend_limit``, ``blocked_keywords``,
-   ``transaction_max``, ``vendor_rules``, ``category_rules``.
+   ``transaction_max``, ``vendor_rules``, ``category_rules``, ``off_hours_rules``.
 
 Pure functions (:func:`evaluate_intent`, :func:`fallback_evaluate`) take an
 intent + tool call + policy knobs and return an approve/block decision dict.
@@ -31,6 +31,7 @@ import os
 import re
 import threading
 import urllib.request
+from datetime import datetime, time as _time
 from typing import List, Optional
 
 __all__ = [
@@ -228,6 +229,23 @@ def _match_category(entry: str, category: str, mcc_code: str) -> bool:
     return bool(category) and entry in category
 
 
+def _parse_hhmm(raw: str) -> Optional[_time]:
+    """Parse an ``"HH:MM"`` string into a :class:`datetime.time`, or ``None``."""
+    try:
+        h, m = raw.split(":")
+        return _time(int(h), int(m))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _in_time_window(now: _time, start: _time, end: _time) -> bool:
+    """Whether ``now`` falls in the ``[start, end]`` window, wrapping past midnight
+    when ``start > end`` (e.g. ``22:00``-``06:00``)."""
+    if start <= end:
+        return start <= now <= end
+    return now >= start or now <= end
+
+
 def check_financial_rules(
     arguments: dict,
     price: Optional[float] = None,
@@ -237,6 +255,7 @@ def check_financial_rules(
     transaction_max: Optional[float] = None,
     vendor_rules: Optional[List[dict]] = None,
     category_rules: Optional[List[dict]] = None,
+    off_hours_rules: Optional[List[dict]] = None,
 ) -> Optional[dict]:
     """Evaluate the user-defined financial rules against one tool call.
 
@@ -246,8 +265,11 @@ def check_financial_rules(
     when no rule matched.
 
     Rule shapes (as stored in dashboard policies):
-      - vendor rule:   ``{"vendors": [...], "action": "block"|"review"|"allow"}``
-      - category rule: ``{"categories": [...], "action": "block"|"review"|"allow"|"limit", "limit": float}``
+      - vendor rule:     ``{"vendors": [...], "action": "block"|"review"|"allow"}``
+      - category rule:   ``{"categories": [...], "action": "block"|"review"|"allow"|"limit", "limit": float}``
+      - off-hours rule:  ``{"start": "HH:MM", "end": "HH:MM"}`` (24h, server UTC time;
+        a window may wrap midnight, e.g. ``"22:00"``-``"06:00"``) — calls made inside
+        the window require human review.
 
     An ``allow`` list only restricts *known* vendors/categories — tool calls
     with no detectable vendor or category pass through (they are still subject
@@ -334,6 +356,18 @@ def check_financial_rules(
             category_label="budget",
         )
 
+    for rule in off_hours_rules or []:
+        start, end = _parse_hhmm(str(rule.get("start", ""))), _parse_hhmm(str(rule.get("end", "")))
+        if start is None or end is None:
+            continue
+        if _in_time_window(datetime.utcnow().time(), start, end):
+            return block(
+                f"Off-Hours Review: Actions between {rule.get('start')} and "
+                f"{rule.get('end')} (UTC) require human approval.",
+                hitl=True,
+                category_label="off_hours",
+            )
+
     return None
 
 
@@ -348,6 +382,7 @@ def fallback_evaluate(
     transaction_max: Optional[float] = None,
     vendor_rules: Optional[List[dict]] = None,
     category_rules: Optional[List[dict]] = None,
+    off_hours_rules: Optional[List[dict]] = None,
     vendor: Optional[str] = None,
     category: Optional[str] = None,
 ) -> dict:
@@ -360,7 +395,8 @@ def fallback_evaluate(
       2. Sensitive-data access + privilege escalation
       3. MCC category + numeric code blocklist (built-in floor)
       3b. User-defined financial rules — vendor allow/block lists, category
-          rules, per-transaction maximum (:func:`check_financial_rules`)
+          rules, per-transaction maximum, off-hours review window
+          (:func:`check_financial_rules`)
       4. Database transaction classification (destructive → block, write → HITL)
       5. Destructive tool semantics (delete/wipe/...) → HITL
       6. Budget cap vs. proposed spend → block
@@ -446,7 +482,7 @@ def fallback_evaluate(
             category="mcc_policy",
         )
 
-    # 3b — User-defined financial rules (vendor / category / transaction max)
+    # 3b — User-defined financial rules (vendor / category / transaction max / off-hours)
     financial_decision = check_financial_rules(
         arguments,
         price=_extract_price(arguments),
@@ -456,6 +492,7 @@ def fallback_evaluate(
         transaction_max=transaction_max,
         vendor_rules=vendor_rules,
         category_rules=category_rules,
+        off_hours_rules=off_hours_rules,
     )
     if financial_decision is not None:
         return financial_decision
@@ -606,6 +643,7 @@ def evaluate_intent(
     transaction_max: Optional[float] = None,
     vendor_rules: Optional[List[dict]] = None,
     category_rules: Optional[List[dict]] = None,
+    off_hours_rules: Optional[List[dict]] = None,
     vendor: Optional[str] = None,
     category: Optional[str] = None,
 ) -> dict:
@@ -618,9 +656,9 @@ def evaluate_intent(
 
     Evaluation order:
       1. MCC blocklist — instant, non-negotiable
-      1b. User-defined financial rules (vendor / category / transaction max) —
-          deterministic, checked before any AI dispatch so the semantic path
-          can never bypass them
+      1b. User-defined financial rules (vendor / category / transaction max /
+          off-hours) — deterministic, checked before any AI dispatch so the
+          semantic path can never bypass them
       2. Gemini semantic evaluation — **only when** ``use_ai`` is True **and**
          ``GEMINI_API_KEY`` is set.  AI-based evaluation is a paid (Pro) feature;
          the open-source SDK and free-tier callers leave ``use_ai`` False and so
@@ -679,6 +717,7 @@ def evaluate_intent(
         transaction_max=transaction_max,
         vendor_rules=vendor_rules,
         category_rules=category_rules,
+        off_hours_rules=off_hours_rules,
     )
     if financial_decision is not None:
         return financial_decision
@@ -690,6 +729,7 @@ def evaluate_intent(
             transaction_max=transaction_max,
             vendor_rules=vendor_rules,
             category_rules=category_rules,
+            off_hours_rules=off_hours_rules,
             vendor=vendor,
             category=category,
         )

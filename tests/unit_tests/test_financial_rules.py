@@ -1,10 +1,16 @@
-"""Tests for the user-defined financial rules (vendor / category / transaction max)."""
+"""Tests for the user-defined financial rules (vendor / category / transaction max / off-hours)."""
+
+from datetime import datetime, timedelta
 
 from qovaris.policy_engine import (
     _extract_vendor,
     check_financial_rules,
     fallback_evaluate,
 )
+
+
+def _hhmm(dt):
+    return dt.strftime("%H:%M")
 
 
 # ── Vendor extraction ─────────────────────────────────────────────────────
@@ -123,6 +129,39 @@ def test_no_rules_returns_none():
     assert check_financial_rules({"vendor": "anyone", "price": 10}) is None
 
 
+# ── Off-hours rules ───────────────────────────────────────────────────────
+
+
+def test_off_hours_rule_triggers_hitl_when_inside_window():
+    now = datetime.utcnow()
+    rules = [{"start": _hhmm(now - timedelta(minutes=5)), "end": _hhmm(now + timedelta(minutes=5))}]
+    decision = check_financial_rules({"price": 10}, off_hours_rules=rules)
+    assert decision is not None
+    assert decision["approved"] is False
+    assert decision["requires_hitl"] is True
+    assert decision["category"] == "off_hours"
+
+
+def test_off_hours_rule_passes_when_outside_window():
+    now = datetime.utcnow()
+    rules = [{"start": _hhmm(now + timedelta(hours=1)), "end": _hhmm(now + timedelta(hours=2))}]
+    assert check_financial_rules({"price": 10}, off_hours_rules=rules) is None
+
+
+def test_off_hours_rule_wraps_midnight():
+    # start > end (as times-of-day) means the window crosses midnight —
+    # "now" sits just after start, on the wrapped side.
+    now = datetime.utcnow()
+    rules = [{"start": _hhmm(now - timedelta(minutes=1)), "end": _hhmm(now - timedelta(hours=12))}]
+    decision = check_financial_rules({"price": 10}, off_hours_rules=rules)
+    assert decision is not None
+    assert decision["requires_hitl"] is True
+
+
+def test_off_hours_rule_ignores_malformed_window():
+    assert check_financial_rules({"price": 10}, off_hours_rules=[{"start": "bad", "end": "22:00"}]) is None
+
+
 # ── Integration with fallback_evaluate ────────────────────────────────────
 
 
@@ -154,6 +193,18 @@ def test_fallback_evaluate_hardcoded_mcc_floor_wins_over_allow():
     )
     assert decision["approved"] is False
     assert decision["category"] == "mcc_policy"
+
+
+def test_fallback_evaluate_enforces_off_hours():
+    now = datetime.utcnow()
+    rules = [{"start": _hhmm(now - timedelta(minutes=5)), "end": _hhmm(now + timedelta(minutes=5))}]
+    decision = fallback_evaluate(
+        "Run a report", "generate_report", {"price": 5.0}, "",
+        off_hours_rules=rules,
+    )
+    assert decision["approved"] is False
+    assert decision["requires_hitl"] is True
+    assert decision["category"] == "off_hours"
 
 
 def test_fallback_evaluate_clean_call_passes_with_rules_configured():
